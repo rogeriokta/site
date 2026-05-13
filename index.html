@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Captura de Cartão de Respostas - WebRTC</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .main-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .camera-container {
+            position: relative;
+            width: 100%;
+            background: #000;
+            overflow: hidden;
+        }
+
+        #camera-view {
+            width: 100%;
+            height: auto;
+            display: block;
+            aspect-ratio: 3/4;
+            object-fit: cover;
+        }
+
+        #canvas-preview {
+            display: none;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 3/4;
+            object-fit: contain;
+            cursor: pointer;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 3px dashed rgba(255, 255, 255, 0.8);
+            border-radius: 10px;
+            width: 85%;
+            height: 70%;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .camera-overlay::after {
+            content: 'Posicione o cartão aqui';
+            color: white;
+            font-size: 14px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #00ff00;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 10;
+        }
+
+        .status-badge.inactive {
+            color: #ff4444;
+        }
+
+        .controls {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            width: 100%;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .btn-capture {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-capture:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn-analyze {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            box-shadow: 0 5px 15px rgba(245, 87, 108, 0.4);
+        }
+
+        .btn-analyze:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(245, 87, 108, 0.6);
+        }
+
+        .btn-retake {
+            background: white;
+            color: #764ba2;
+            border: 2px solid #764ba2;
+        }
+
+        .btn-send {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+            box-shadow: 0 5px 15px rgba(67, 233, 123, 0.4);
+        }
+
+        .btn-send:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(67, 233, 123, 0.6);
+        }
+
+        .info-panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #495057;
+        }
+
+        .info-value {
+            color: #764ba2;
+        }
+
+        /* Painel de Visualização */
+        .viewer-panel {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .viewer-header {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .viewer-header h2 {
+            font-size: 20px;
+        }
+
+        .viewer-tabs {
+            display: flex;
+            background: #f8f9fa;
+        }
+
+        .viewer-tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            background: #e9ecef;
+            border: none;
+            font-size: 14px;
+            font-weight: bold;
+            color: #495057;
+            transition: all 0.3s ease;
+        }
+
+        .viewer-tab.active {
+            background: white;
+            color: #764ba2;
+            border-bottom: 3px solid #764ba2;
+        }
+
+        .viewer-content {
+            position: relative;
+            background: #f8f9fa;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .viewer-image-container {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            overflow: hidden;
+            cursor: zoom-in;
+        }
+
+        .viewer-image-container.zoomed {
+            cursor: zoom-out;
+            overflow: auto;
+        }
+
+        .viewer-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: transform 0.3s ease;
+        }
+
+        .viewer-image-container.zoomed .viewer-image {
+            transform: scale(2);
+            transform-origin: var(--zoom-x) var(--zoom-y);
+        }
+
+        .placeholder-text {
+            color: #adb5bd;
+            font-size: 18px;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .comparison-slider {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            overflow: hidden;
+        }
+
+        .comparison-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .comparison-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 50%;
+            height: 100%;
+            overflow: hidden;
+            border-right: 3px solid #764ba2;
+        }
+
+        .comparison-overlay .comparison-image {
+            width: 200%;
+        }
+
+        .slider-handle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            background: #764ba2;
+            border-radius: 50%;
+            cursor: ew-resize;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            z-index: 10;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .slider-line {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 3px;
+            height: 100%;
+            background: #764ba2;
+            z-index: 5;
+        }
+
+        .image-label {
+            position: absolute;
+            bottom: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+
+        .label-original {
+            left: 10px;
+        }
+
+        .label-processed {
+            right: 10px;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+            z-index: 10;
+        }
+
+        .zoom-btn {
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            width: 35px;
+            height: 35px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .zoom-btn:hover {
+            background: rgba(0, 0, 0, 0.9);
+        }
+
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            z-index: 1000;
+            text-align: center;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #764ba2;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .flash.active {
+            animation: flash 0.5s ease-out;
+        }
+
+        @keyframes flash {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        .processing-steps {
+            padding: 15px;
+            background: #f8f9fa;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            color: #adb5bd;
+            font-size: 14px;
+        }
+
+        .step.completed {
+            color: #28a745;
+        }
+
+        .step.active {
+            color: #764ba2;
+            font-weight: bold;
+        }
+
+        .step-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid currentColor;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        @media (max-width: 480px) {
+            .container,
+            .viewer-panel {
+                border-radius: 0;
+            }
+            
+            .btn {
+                padding: 12px 20px;
+                font-size: 14px;
+            }
+            
+            .viewer-image-container {
+                height: 300px;
+            }
+            
+            .comparison-slider {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Painel de Captura -->
+        <div class="container">
+            <div class="header">
+                <h1>📸 Captura de Cartão</h1>
+                <p>Faculdade Sudamérica - Sistema de Correção</p>
+            </div>
+
+            <div class="camera-container" id="camera-container">
+                <video id="camera-view" autoplay playsinline></video>
+                <img id="canvas-preview" alt="Preview da captura">
+                <div class="camera-overlay" id="overlay"></div>
+                <div class="status-badge" id="camera-status">
+                    <span id="status-text">Câmera Ativa</span>
+                </div>
+                <div class="flash" id="flash"></div>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-capture" id="btn-capture" disabled>
+                    📷 Capturar Cartão
+                </button>
+                <button class="btn btn-retake" id="btn-retake" style="display: none;">
+                    🔄 Tirar Nova Foto
+                </button>
+                <button class="btn btn-analyze" id="btn-analyze" style="display: none;" disabled>
+                    🔍 Processar Imagem
+                </button>
+                <button class="btn btn-send" id="btn-send" style="display: none;">
+                    📤 Enviar para Correção
+                </button>
+
+                <div class="info-panel" id="image-info" style="display: none;">
+                    <div class="info-item">
+                        <span class="info-label">Resolução:</span>
+                        <span class="info-value" id="info-resolution">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Qualidade:</span>
+                        <span class="info-value" id="info-quality">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Detecção:</span>
+                        <span class="info-value" id="info-detection">-</span>
+                    </div>
+                </div>
+
+                <div class="processing-steps" id="processing-steps" style="display: none;">
+                    <div class="step" id="step-detect">
+                        <span class="step-icon">1</span>
+                        <span>Detectando cartão</span>
+                    </div>
+                    <div class="step" id="step-perspective">
+                        <span class="step-icon">2</span>
+                        <span>Corrigindo perspectiva</span>
+                    </div>
+                    <div class="step" id="step-enhance">
+                        <span class="step-icon">3</span>
+                        <span>Melhorando qualidade</span>
+                    </div>
+                    <div class="step" id="step-binarize">
+                        <span class="step-icon">4</span>
+                        <span>Binarizando imagem</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Painel de Visualização -->
+        <div class="viewer-panel" id="viewer-panel">
+            <div class="viewer-header">
+                <h2>🔍 Visualização</h2>
+                <span style="font-size: 14px;">Clique na imagem para zoom</span>
+            </div>
+            
+            <div class="viewer-tabs">
+                <button class="viewer-tab active" data-tab="original">Original</button>
+                <button class="viewer-tab" data-tab="processed">Processada</button>
+                <button class="viewer-tab" data-tab="comparison">Comparação</button>
+            </div>
+
+            <div class="viewer-content" id="viewer-content">
+                <!-- Conteúdo Original -->
+                <div class="viewer-image-container" id="viewer-original" style="display: block;">
+                    <img class="viewer-image" id="img-original" src="" alt="Imagem original" style="display: none;">
+                    <p class="placeholder-text" id="placeholder-original">
+                        📸 Capture uma foto para visualizar
+                    </p>
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" onclick="zoomImage('original', 0.5)">−</button>
+                        <button class="zoom-btn" onclick="zoomImage('original', 2)">+</button>
+                        <button class="zoom-btn" onclick="resetZoom('original')">↺</button>
+                    </div>
+                </div>
+
+                <!-- Conteúdo Processado -->
+                <div class="viewer-image-container" id="viewer-processed" style="display: none;">
+                    <img class="viewer-image" id="img-processed" src="" alt="Imagem processada" style="display: none;">
+                    <p class="placeholder-text" id="placeholder-processed">
+                        🔧 Processe a imagem para visualizar
+                    </p>
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" onclick="zoomImage('processed', 0.5)">−</button>
+                        <button class="zoom-btn" onclick="zoomImage('processed', 2)">+</button>
+                        <button class="zoom-btn" onclick="resetZoom('processed')">↺</button>
+                    </div>
+                </div>
+
+                <!-- Comparação Lado a Lado -->
+                <div class="comparison-slider" id="viewer-comparison" style="display: none;">
+                    <img class="comparison-image" id="img-comparison-original" src="" alt="Original">
+                    <div class="comparison-overlay" id="comparison-overlay">
+                        <img class="comparison-image" id="img-comparison-processed" src="" alt="Processada">
+                    </div>
+                    <div class="slider-line"></div>
+                    <div class="slider-handle" id="slider-handle">⟷</div>
+                    <div class="image-label label-original">Original</div>
+                    <div class="image-label label-processed">Processada</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <span id="loading-text">Processando imagem...</span>
+    </div>
+
+    <!-- OpenCV.js -->
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+
+    <script>
+        // Variáveis globais
+        let videoElement = null;
+        let stream = null;
+        let capturedImage = null;
+        let processedImage = null;
+        let originalImageUrl = null;
+        let cvReady = false;
+        let isCameraActive = false;
+        let currentZoom = {
+            original: 1,
+            processed: 1
+        };
+
+        // Elementos DOM
+        const cameraView = document.getElementById('camera-view');
+        const canvasPreviewElement = document.getElementById('canvas-preview');
+        const overlay = document.getElementById('overlay');
+        const flash = document.getElementById('flash');
+        const cameraStatus = document.getElementById('camera-status');
+        const statusText = document.getElementById('status-text');
+        const btnCapture = document.getElementById('btn-capture');
+        const btnRetake = document.getElementById('btn-retake');
+        const btnAnalyze = document.getElementById('btn-analyze');
+        const btnSend = document.getElementById('btn-send');
+        const imageInfo = document.getElementById('image-info');
+        const loadingElement = document.getElementById('loading');
+        const loadingText = document.getElementById('loading-text');
+        const processingSteps = document.getElementById('processing-steps');
+
+        // Configuração da câmera
+        const cameraConfig = {
+            video: {
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+                facingMode: 'environment',
+                aspectRatio: { ideal: 3/4 }
+            }
+        };
+
+        // Quando OpenCV estiver pronto
+        function onOpenCvReady() {
+            cvReady = true;
+            console.log('OpenCV.js carregado com sucesso!');
+            if (isCameraActive && capturedImage) {
+                btnAnalyze.disabled = false;
+            }
+        }
+
+        // Inicializar câmera
+        async function initCamera() {
+            try {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('API de câmera não suportada');
+                }
+
+                const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                if (isMobile) {
+                    cameraConfig.video.facingMode = { exact: 'environment' };
+                }
+
+                stream = await navigator.mediaDevices.getUserMedia(cameraConfig);
+                cameraView.srcObject = stream;
+                await cameraView.play();
+                
+                isCameraActive = true;
+                statusText.textContent = 'Câmera Ativa';
+                cameraStatus.classList.remove('inactive');
+                btnCapture.disabled = false;
+
+            } catch (error) {
+                console.error('Erro ao acessar câmera:', error);
+                statusText.textContent = 'Erro na Câmera';
+                cameraStatus.classList.add('inactive');
+                
+                let errorMessage = 'Não foi possível acessar a câmera. ';
+                if (error.name === 'NotAllowedError') {
+                    errorMessage += 'Permita o acesso à câmera nas configurações do navegador.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage += 'Nenhuma câmera encontrada no dispositivo.';
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                alert(errorMessage);
+            }
+        }
+
+        // Parar câmera
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+                cameraView.srcObject = null;
+                isCameraActive = false;
+                statusText.textContent = 'Câmera Desligada';
+                cameraStatus.classList.add('inactive');
+            }
+        }
+
+        // Capturar foto em alta resolução
+        function capturePhoto() {
+            if (!isCameraActive) return;
+
+            // Efeito flash
+            flash.classList.add('active');
+            setTimeout(() => flash.classList.remove('active'), 500);
+
+            const captureCanvas = document.createElement('canvas');
+            captureCanvas.width = cameraView.videoWidth;
+            captureCanvas.height = cameraView.videoHeight;
+            
+            const ctx = captureCanvas.getContext('2d');
+            ctx.drawImage(cameraView, 0, 0, captureCanvas.width, captureCanvas.height);
+
+            captureCanvas.toBlob((blob) => {
+                capturedImage = blob;
+                originalImageUrl = URL.createObjectURL(blob);
+                
+                // Atualizar preview na câmera
+                canvasPreviewElement.src = originalImageUrl;
+                displayPreview(originalImageUrl);
+                
+                // Atualizar visualizador
+                updateViewer('original', originalImageUrl);
+                
+                updateUIForCapturedImage();
+                updateImageInfo(captureCanvas.width, captureCanvas.height);
+                
+            }, 'image/jpeg', 1.0);
+        }
+
+        // Exibir preview da imagem capturada
+        function displayPreview(imageUrl) {
+            cameraView.style.display = 'none';
+            canvasPreviewElement.style.display = 'block';
+            overlay.style.display = 'none';
+        }
+
+        // Mostrar câmera novamente
+        function showCamera() {
+            cameraView.style.display = 'block';
+            canvasPreviewElement.style.display = 'none';
+            overlay.style.display = 'block';
+            capturedImage = null;
+            processedImage = null;
+            originalImageUrl = null;
+            
+            // Limpar visualizador
+            clearViewer();
+            
+            updateUIForCamera();
+            imageInfo.style.display = 'none';
+            processingSteps.style.display = 'none';
+        }
+
+        // Atualizar UI após captura
+        function updateUIForCapturedImage() {
+            btnCapture.style.display = 'none';
+            btnRetake.style.display = 'block';
+            btnAnalyze.style.display = 'block';
+            btnAnalyze.disabled = !cvReady;
+            btnSend.style.display = 'none';
+            imageInfo.style.display = 'block';
+            processingSteps.style.display = 'block';
+            
+            // Resetar steps
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('completed', 'active');
+            });
+        }
+
+        // Atualizar UI para modo câmera
+        function updateUIForCamera() {
+            btnCapture.style.display = 'block';
+            btnRetake.style.display = 'none';
+            btnAnalyze.style.display = 'none';
+            btnSend.style.display = 'none';
+            imageInfo.style.display = 'none';
+            processingSteps.style.display = 'none';
+        }
+
+        // Atualizar informações da imagem
+        function updateImageInfo(width, height) {
+            document.getElementById('info-resolution').textContent = `${width} x ${height}px`;
+            const megapixels = ((width * height) / 1000000).toFixed(1);
+            document.getElementById('info-quality').textContent = `${megapixels} MP`;
+            document.getElementById('info-detection').textContent = 'Pendente';
+            document.getElementById('info-detection').style.color = '#764ba2';
+        }
+
+        // Atualizar visualizador
+        function updateViewer(type, imageUrl) {
+            if (type === 'original') {
+                const imgOriginal = document.getElementById('img-original');
+                const placeholder = document.getElementById('placeholder-original');
+                imgOriginal.src = imageUrl;
+                imgOriginal.style.display = 'block';
+                placeholder.style.display = 'none';
+            } else if (type === 'processed') {
+                const imgProcessed = document.getElementById('img-processed');
+                const placeholder = document.getElementById('placeholder-processed');
+                imgProcessed.src = imageUrl;
+                imgProcessed.style.display = 'block';
+                placeholder.style.display = 'none';
+                
+                // Atualizar também a comparação
+                const imgComparisonProcessed = document.getElementById('img-comparison-processed');
+                if (imgComparisonProcessed) {
+                    imgComparisonProcessed.src = imageUrl;
+                }
+            }
+        }
+
+        // Limpar visualizador
+        function clearViewer() {
+            document.getElementById('img-original').style.display = 'none';
+            document.getElementById('placeholder-original').style.display = 'block';
+            document.getElementById('img-processed').style.display = 'none';
+            document.getElementById('placeholder-processed').style.display = 'block';
+            
+            // Resetar para tab original
+            switchTab('original');
+        }
+
+        // Trocar tabs do visualizador
+        function switchTab(tabName) {
+            // Atualizar tabs
+            document.querySelectorAll('.viewer-tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.dataset.tab === tabName) {
+                    tab.classList.add('active');
+                }
+            });
+
+            // Mostrar/esconder conteúdos
+            document.getElementById('viewer-original').style.display = tabName === 'original' ? 'block' : 'none';
+            document.getElementById('viewer-processed').style.display = tabName === 'processed' ? 'block' : 'none';
+            document.getElementById('viewer-comparison').style.display = tabName === 'comparison' ? 'block' : 'none';
+        }
+
+        // Zoom nas imagens
+        function zoomImage(type, factor) {
+            const container = document.getElementById(`viewer-${type}`);
+            const img = document.getElementById(`img-${type}`);
+            
+            if (!img.src) return;
+            
+            currentZoom[type] *= factor;
+            currentZoom[type] = Math.max(0.5, Math.min(3, currentZoom[type]));
+            
+            img.style.transform = `scale(${currentZoom[type]})`;
+            
+            if (currentZoom[type] > 1) {
+                container.classList.add('zoomed');
+            } else {
+                container.classList.remove('zoomed');
+            }
+        }
+
+        function resetZoom(type) {
+            const container = document.getElementById(`viewer-${type}`);
+            const img = document.getElementById(`img-${type}`);
+            
+            currentZoom[type] = 1;
+            img.style.transform = 'scale(1)';
+            container.classList.remove('zoomed');
+        }
+
+        // Processar imagem com OpenCV.js
+        async function processImage() {
+            if (!capturedImage || !cvReady) return;
+
+            showLoading('Analisando imagem com OpenCV...');
+            
+            // Ativar steps
+            const stepDetect = document.getElementById('step-detect');
+            const stepPerspective = document.getElementById('step-perspective');
+            const stepEnhance = document.getElementById('step-enhance');
+            const stepBinarize = document.getElementById('step-binarize');
+
+            try {
+                // Criar imagem a partir do blob capturado
+                const img = new Image();
+                img.src = URL.createObjectURL(capturedImage);
+                
+                await new Promise((resolve) => {
+                    img.onload = resolve;
+                });
+
+                // Criar canvas para processamento
+                const processCanvas = document.createElement('canvas');
+                processCanvas.width = img.width;
+                processCanvas.height = img.height;
+                const ctx = processCanvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+
+                // Step 1: Detectar cartão
+                stepDetect.classList.add('active');
+                await sleep(500);
+
+                const src = cv.imread(processCanvas);
+                const gray = new cv.Mat();
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+
+                const blurred = new cv.Mat();
+                cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+
+                const edges = new cv.Mat();
+                cv.Canny(blurred, edges, 50, 150);
+
+                const contours = new cv.MatVector();
+                const hierarchy = new cv.Mat();
+                cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+                let maxArea = 0;
+                let documentContour = null;
+
+                for (let i = 0; i < contours.size(); i++) {
+                    const contour = contours.get(i);
+                    const area = cv.contourArea(contour);
+                    const perimeter = cv.arcLength(contour, true);
+                    const approx = new cv.Mat();
+                    cv.approxPolyDP(contour, approx, 0.02 * perimeter, true);
+
+                    if (approx.rows === 4 && area > maxArea) {
+                        maxArea = area;
+                        documentContour = approx;
+                    }
+                }
+
+                stepDetect.classList.remove('active');
+                stepDetect.classList.add('completed');
+
+                if (documentContour) {
+                    // Step 2: Corrigir perspectiva
+                    stepPerspective.classList.add('active');
+                    await sleep(500);
+
+                    const points = [];
+                    for (let i = 0; i < 4; i++) {
+                        points.push({
+                            x: documentContour.data32S[i * 2],
+                            y: documentContour.data32S[i * 2 + 1]
+                        });
+                    }
+
+                    points.sort((a, b) => a.y - b.y);
+                    const top = points.slice(0, 2).sort((a, b) => a.x - b.x);
+                    const bottom = points.slice(2, 4).sort((a, b) => b.x - a.x);
+
+                    const srcPoints = [
+                        top[0].x, top[0].y,
+                        top[1].x, top[1].y,
+                        bottom[0].x, bottom[0].y,
+                        bottom[1].x, bottom[1].y
+                    ];
+
+                    const width = 2100;
+                    const height = 2970;
+                    
+                    const dstPoints = [0, 0, width, 0, width, height, 0, height];
+
+                    const srcMat = cv.matFromArray(4, 1, cv.CV_32FC2, srcPoints);
+                    const dstMat = cv.matFromArray(4, 1, cv.CV_32FC2, dstPoints);
+                    const transform = cv.getPerspectiveTransform(srcMat, dstMat);
+                    
+                    const warped = new cv.Mat();
+                    cv.warpPerspective(src, warped, transform, new cv.Size(width, height));
+
+                    stepPerspective.classList.remove('active');
+                    stepPerspective.classList.add('completed');
+
+                    // Step 3: Melhorar qualidade
+                    stepEnhance.classList.add('active');
+                    await sleep(500);
+
+                    const enhanced = new cv.Mat();
+                    cv.cvtColor(warped, enhanced, cv.COLOR_RGBA2GRAY);
+                    
+                    stepEnhance.classList.remove('active');
+                    stepEnhance.classList.add('completed');
+
+                    // Step 4: Binarizar
+                    stepBinarize.classList.add('active');
+                    await sleep(500);
+
+                    const binary = new cv.Mat();
+                    cv.adaptiveThreshold(enhanced, binary, 255, 
+                                        cv.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                        cv.THRESH_BINARY, 11, 2);
+
+                    cv.imshow(processCanvas, warped);
+                    
+                    stepBinarize.classList.remove('active');
+                    stepBinarize.classList.add('completed');
+                    
+                    // Salvar imagem processada
+                    processedImage = processCanvas.toDataURL('image/jpeg', 0.95);
+                    
+                    // Atualizar visualizador
+                    updateViewer('processed', processedImage);
+                    updateViewer('comparison', processedImage);
+                    
+                    // Atualizar comparação
+                    const imgComparisonOriginal = document.getElementById('img-comparison-original');
+                    if (originalImageUrl) {
+                        imgComparisonOriginal.src = originalImageUrl;
+                    }
+                    
+                    document.getElementById('info-detection').textContent = 'Detectado ✓';
+                    document.getElementById('info-detection').style.color = '#28a745';
+
+                    // Limpar memória
+                    warped.delete();
+                    enhanced.delete();
+                    binary.delete();
+                    srcMat.delete();
+                    dstMat.delete();
+                    transform.delete();
+                } else {
+                    stepPerspective.classList.add('completed');
+                    stepEnhance.classList.add('completed');
+                    stepBinarize.classList.add('completed');
+                    
+                    document.getElementById('info-detection').textContent = 'Não detectado';
+                    document.getElementById('info-detection').style.color = '#dc3545';
+                    
+                    alert('Não foi possível detectar o cartão. Tente capturar novamente com melhor iluminação.');
+                }
+
+                // Limpar memória OpenCV
+                src.delete();
+                gray.delete();
+                blurred.delete();
+                edges.delete();
+                contours.delete();
+                hierarchy.delete();
+
+                btnSend.style.display = 'block';
+
+            } catch (error) {
+                console.error('Erro no processamento:', error);
+                alert('Erro ao processar imagem: ' + error.message);
+                
+                document.querySelectorAll('.step.active').forEach(step => {
+                    step.classList.remove('active');
+                    step.classList.add('completed');
+                });
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Enviar imagem para API de correção
+        async function sendForCorrection() {
+            const imageToSend = processedImage || URL.createObjectURL(capturedImage);
+            
+            showLoading('Enviando para correção...');
+
+            try {
+                const formData = new FormData();
+                
+                if (processedImage && processedImage.startsWith('data:')) {
+                    const response = await fetch(processedImage);
+                    const blob = await response.blob();
+                    formData.append('cartao_resposta', blob, 'cartao.jpg');
+                } else if (capturedImage) {
+                    formData.append('cartao_resposta', capturedImage, 'cartao.jpg');
+                }
+
+                formData.append('aluno', 'João Silva');
+                formData.append('matricula', '2026001');
+                formData.append('turma', '1º Período CCO teste');
+
+                const apiResponse = await fetch('https://api.exemplo.com/correcao', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Authorization': 'Bearer SEU_TOKEN_AQUI'
+                    }
+                });
+
+                if (apiResponse.ok) {
+                    const result = await apiResponse.json();
+                    alert('Cartão enviado com sucesso! Resultado da correção será disponibilizado em breve.');
+                    console.log('Resultado:', result);
+                } else {
+                    throw new Error('Erro ao enviar para API');
+                }
+
+            } catch (error) {
+                console.error('Erro no envio:', error);
+                alert('Erro ao enviar cartão. Tente novamente.');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Funções auxiliares
+        function showLoading(message) {
+            loadingText.textContent = message;
+            loadingElement.classList.add('show');
+        }
+
+        function hideLoading() {
+            loadingElement.classList.remove('show');
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Event Listeners
+        btnCapture.addEventListener('click', capturePhoto);
+        btnRetake.addEventListener('click', showCamera);
+        btnAnalyze.addEventListener('click', processImage);
+        btnSend.addEventListener('click', sendForCorrection);
+
+        // Tabs do visualizador
+        document.querySelectorAll('.viewer-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                switchTab(tab.dataset.tab);
+            });
+        });
+
+        // Slider de comparação
+        const sliderHandle = document.getElementById('slider-handle');
+        const comparisonOverlay = document.getElementById('comparison-overlay');
+        let isDragging = false;
+
+        sliderHandle.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            e.preventDefault();
+        });
+
+        sliderHandle.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            updateSliderPosition(e.clientX);
+        });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            updateSliderPosition(e.touches[0].clientX);
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        document.addEventListener('touchend', () => {
+            isDragging = false;
+        });
+
+        function updateSliderPosition(clientX) {
+            const slider = document.getElementById('viewer-comparison');
+            const rect = slider.getBoundingClientRect();
+            let position = ((clientX - rect.left) / rect.width) * 100;
+            position = Math.max(0, Math.min(100, position));
+            
+            comparisonOverlay.style.width = position + '%';
+            sliderHandle.style.left = position + '%';
+        }
+
+        // Click na imagem para zoom
+        document.getElementById('viewer-original').addEventListener('click', function(e) {
+            if (e.target.tagName === 'BUTTON') return;
+            const img = document.getElementById('img-original');
+            if (!img.src) return;
+            
+            if (currentZoom.original > 1) {
+                resetZoom('original');
+            } else {
+                zoomImage('original', 2);
+            }
+        });
+
+        document.getElementById('viewer-processed').addEventListener('click', function(e) {
+            if (e.target.tagName === 'BUTTON') return;
+            const img = document.getElementById('img-processed');
+            if (!img.src) return;
+            
+            if (currentZoom.processed > 1) {
+                resetZoom('processed');
+            } else {
+                zoomImage('processed', 2);
+            }
+        });
+
+        // Inicializar quando a página carregar
+        window.addEventListener('load', () => {
+            initCamera();
+        });
+
+        // Limpar recursos quando a página for fechada
+        window.addEventListener('beforeunload', () => {
+            stopCamera();
+        });
+
+        // Tratamento de visibilidade da página
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopCamera();
+            } else {
+                initCamera();
+            }
+        });
+    </script>
+</body>
+</html>
