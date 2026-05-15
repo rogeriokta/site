@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Captura de Cartão de Respostas</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Login Modal -->
+    <div class="modal-overlay" id="login-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Login</h2>
+                <p>Faculdade Sudamérica - Sistema de Correção</p>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="login-user">Usuário</label>
+                    <input type="text" id="login-user" class="form-input" placeholder="Digite seu usuário" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="login-pass">Senha</label>
+                    <input type="password" id="login-pass" class="form-input" placeholder="Digite sua senha" autocomplete="current-password">
+                </div>
+                <div class="form-error" id="login-error"></div>
+                <button class="btn btn-capture" id="btn-login-submit">Entrar</button>
+                <button class="btn btn-retake" id="btn-login-skip" style="margin-top:8px;">Continuar sem login</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Form Modal -->
+    <div class="modal-overlay" id="student-modal">
+        <div class="modal">
+            <div class="modal-header" style="background:linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                <h2>Dados do Aluno</h2>
+                <p>Preencha os dados antes de capturar</p>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="student-name">Nome do Aluno</label>
+                    <input type="text" id="student-name" class="form-input" placeholder="Nome completo" required>
+                </div>
+                <div class="form-group">
+                    <label for="student-id">Matrícula</label>
+                    <input type="text" id="student-id" class="form-input" placeholder="Número da matrícula" required>
+                </div>
+                <div class="form-group">
+                    <label for="student-class">Turma</label>
+                    <input type="text" id="student-class" class="form-input" placeholder="Ex: 1º Período CCO" required>
+                </div>
+                <div class="form-group">
+                    <label for="student-discipline">Disciplina</label>
+                    <input type="text" id="student-discipline" class="form-input" placeholder="Ex: Matemática">
+                </div>
+                <div class="form-group">
+                    <label for="gabarito-input">Gabarito (opcional)</label>
+                    <input type="text" id="gabarito-input" class="form-input" placeholder='Ex: {"1":"A","2":"B"}'>
+                </div>
+                <button class="btn btn-send" id="btn-student-confirm">Confirmar e Iniciar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <!-- Painel de Captura -->
+        <div class="container">
+            <div class="header">
+                <h1>Captura de Cartão</h1>
+                <p id="header-user">Faculdade Sudamérica - Sistema de Correção</p>
+            </div>
+
+            <div class="camera-container" id="camera-container">
+                <video id="camera-view" autoplay playsinline></video>
+                <img id="canvas-preview" alt="Preview da captura">
+                <div class="camera-overlay" id="overlay"></div>
+                <div class="status-badge" id="camera-status">
+                    <span id="status-text">Câmera Ativa</span>
+                </div>
+                <div class="flash" id="flash"></div>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-capture" id="btn-capture" disabled>
+                    Capturar Cartão
+                </button>
+                <button class="btn btn-retake" id="btn-retake" style="display: none;">
+                    Tirar Nova Foto
+                </button>
+                <button class="btn btn-analyze" id="btn-analyze" style="display: none;">
+                    Processar Imagem
+                </button>
+                <button class="btn btn-send" id="btn-send" style="display: none;">
+                    Ver Resultado
+                </button>
+
+                <div class="info-panel" id="image-info" style="display: none;">
+                    <div class="info-item">
+                        <span class="info-label">Aluno:</span>
+                        <span class="info-value" id="info-student">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Resolução:</span>
+                        <span class="info-value" id="info-resolution">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Qualidade:</span>
+                        <span class="info-value" id="info-quality">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Detecção:</span>
+                        <span class="info-value" id="info-detection">-</span>
+                    </div>
+                </div>
+
+                <div class="processing-steps" id="processing-steps" style="display: none;">
+                    <div class="step" id="step-upload">
+                        <span class="step-icon">1</span>
+                        <span>Enviando imagem</span>
+                    </div>
+                    <div class="step" id="step-detect">
+                        <span class="step-icon">2</span>
+                        <span>Detectando cartão</span>
+                    </div>
+                    <div class="step" id="step-perspective">
+                        <span class="step-icon">3</span>
+                        <span>Corrigindo perspectiva</span>
+                    </div>
+                    <div class="step" id="step-omr">
+                        <span class="step-icon">4</span>
+                        <span>Extraindo respostas</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Painel de Visualização -->
+        <div class="viewer-panel" id="viewer-panel">
+            <div class="viewer-header">
+                <h2>Visualização</h2>
+                <span style="font-size:14px;">Clique na imagem para zoom</span>
+            </div>
+
+            <div class="viewer-tabs">
+                <button class="viewer-tab active" data-tab="original">Original</button>
+                <button class="viewer-tab" data-tab="processed">Processada</button>
+                <button class="viewer-tab" data-tab="comparison">Comparação</button>
+                <button class="viewer-tab" data-tab="result">Resultado</button>
+            </div>
+
+            <div class="viewer-content" id="viewer-content">
+                <div class="viewer-image-container" id="viewer-original" style="display: block;">
+                    <img class="viewer-image" id="img-original" src="" alt="Imagem original" style="display: none;">
+                    <p class="placeholder-text" id="placeholder-original">Capture uma foto para visualizar</p>
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" onclick="viewer.zoom('original', 0.5)">−</button>
+                        <button class="zoom-btn" onclick="viewer.zoom('original', 2)">+</button>
+                        <button class="zoom-btn" onclick="viewer.resetZoom('original')">↺</button>
+                    </div>
+                </div>
+
+                <div class="viewer-image-container" id="viewer-processed" style="display: none;">
+                    <img class="viewer-image" id="img-processed" src="" alt="Imagem processada" style="display: none;">
+                    <p class="placeholder-text" id="placeholder-processed">Processe a imagem para visualizar</p>
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" onclick="viewer.zoom('processed', 0.5)">−</button>
+                        <button class="zoom-btn" onclick="viewer.zoom('processed', 2)">+</button>
+                        <button class="zoom-btn" onclick="viewer.resetZoom('processed')">↺</button>
+                    </div>
+                </div>
+
+                <div class="comparison-slider" id="viewer-comparison" style="display: none;">
+                    <img class="comparison-image" id="img-comparison-original" src="" alt="Original">
+                    <div class="comparison-overlay" id="comparison-overlay">
+                        <img class="comparison-image" id="img-comparison-processed" src="" alt="Processada">
+                    </div>
+                    <div class="slider-line"></div>
+                    <div class="slider-handle" id="slider-handle">⟷</div>
+                    <div class="image-label label-original">Original</div>
+                    <div class="image-label label-processed">Processada</div>
+                </div>
+
+                <!-- Resultado -->
+                <div id="viewer-result" style="display:none;width:100%;padding:20px;">
+                    <div id="result-summary"></div>
+                    <div id="result-details" style="margin-top:15px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <span id="loading-text">Processando...</span>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/camera.js"></script>
+    <script src="js/viewer.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
